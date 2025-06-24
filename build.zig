@@ -3,12 +3,8 @@ const Build = std.Build;
 
 pub fn build(b: *std.Build) void {
     const is_root = b.pkg_hash.len == 0;
-    const target = if (is_root) b.standardTargetOptions(.{}) else null;
-    const optimize = if (is_root) b.standardOptimizeOption(.{}) else null;
 
-    const bin_install = !(b.option(bool, "no-bin", "Don't install any of the binaries implied by the specified steps.") orelse false);
-    const bin_run = !(b.option(bool, "no-run", "Don't run any of the executables implied by the specified steps.") orelse false);
-    const filters = b.option([]const []const u8, "filter", "List of filters for tests.") orelse &.{};
+    const target = if (is_root) b.standardTargetOptions(.{}) else null;
 
     const install_step = b.getInstallStep();
     const unit_test_step = b.step("unit-test", "Run unit tests.");
@@ -26,23 +22,27 @@ pub fn build(b: *std.Build) void {
     const objwf_mod = b.addModule("objwf", .{
         .root_source_file = b.path("src/objwf.zig"),
         .target = target,
-        .imports = &.{},
     });
 
-    if (is_root) {
-        const unit_test_exe = b.addTest(.{
-            .name = "unit-test",
-            .root_module = objwf_mod,
-            .optimize = optimize orelse .Debug,
-            .filters = filters,
-        });
-        const unit_test_output = addInstallAndRun(b, unit_test_exe, unit_test_step, .{
-            .run = bin_run,
-            .install = bin_install,
-            .install_options = .{},
-        });
-        _ = unit_test_output;
-    }
+    if (!is_root) return;
+    const bin_install = !(b.option(bool, "no-bin", "Don't install any of the binaries implied by the specified steps.") orelse false);
+    const bin_run = !(b.option(bool, "no-run", "Don't run any of the executables implied by the specified steps.") orelse false);
+
+    const optimize = b.standardOptimizeOption(.{});
+    const filters = b.option([]const []const u8, "filter", "List of filters for tests.") orelse &.{};
+
+    const unit_test_exe = b.addTest(.{
+        .name = "unit-test",
+        .root_module = objwf_mod,
+        .optimize = optimize,
+        .filters = filters,
+    });
+    const unit_test_output = addInstallAndRun(b, unit_test_exe, unit_test_step, .{
+        .run = bin_run,
+        .install = bin_install,
+        .install_options = .{},
+    });
+    _ = unit_test_output;
 }
 
 const InstallAndRunOptions = struct {

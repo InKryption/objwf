@@ -1,0 +1,12 @@
+.{
+    .name = .objwf,
+    .version = "0.0.1",
+    .fingerprint = 0xcd804da35a1fb2ff, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+    .dependencies = .{},
+}

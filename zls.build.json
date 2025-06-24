@@ -1,0 +1,6 @@
+{
+  "build_options": [
+    { "name": "no-bin" },
+    { "name": "no-run" }
+  ]
+}

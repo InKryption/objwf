@@ -332,9 +332,15 @@ pub const Node = struct {
         f_multi_v_vt_vn: []const [3]RefIndex,
 
         pub const Call = struct {
-            /// Never null.
-            filename: StrSet.Index,
-            args: []const StrSet.Index,
+            argv: []const StrSet.Index,
+
+            pub fn filename(call: Call) StrSet.Index {
+                return call.argv[0];
+            }
+
+            pub fn args(call: Call) []const StrSet.Index {
+                return call.argv[1..];
+            }
         };
 
         pub fn fmt(self: Unzipped, ast: Ast) Fmt {
@@ -357,8 +363,8 @@ pub const Node = struct {
                 switch (self.node) {
                     .call => |call| {
                         try writer.print("call {s} {s}", .{
-                            call.filename.fmt(self.ast.str_set),
-                            self.ast.str_set.listFmt(call.args),
+                            call.filename().fmt(self.ast.str_set),
+                            self.ast.str_set.listFmt(call.args()),
                         });
                     },
                     .call_no_args => |call_filename| {
@@ -465,8 +471,7 @@ pub const Node = struct {
 
             .call,
             => .{ .call = .{
-                .filename = .from(ast.extra[node.data.index]),
-                .args = ast.strListSliceToNull(node.data.index + 1),
+                .argv = ast.strListSliceToNull(node.data.index),
             } },
 
             .mtllib_one => .{ .mtllib_one = node.data.string },
@@ -1102,8 +1107,8 @@ fn testAstParse(
                         break :blk result;
                     },
                     Node.Unzipped.Call => .{
-                        ast.str_set.getStr(payload.filename),
-                        try strIndicesToStrings(node_arena, ast.str_set, payload.args),
+                        ast.str_set.getStr(payload.filename()),
+                        try strIndicesToStrings(node_arena, ast.str_set, payload.args()),
                     },
 
                     RefIndex,

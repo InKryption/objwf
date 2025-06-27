@@ -74,7 +74,7 @@ pub const ParseDiagnostic = union {
         pub const Face = struct {
             line: u32,
             loc: Lexer.Token.Loc,
-            layout: Ast.Node.FaceTriplet.Layout,
+            layout: Ast.FaceTriplet.Layout,
         };
     };
 
@@ -693,7 +693,7 @@ fn parseUnchecked(
                         else => unreachable,
                     },
                     else => extra.appendAssumeCapacity(
-                        @bitCast(Ast.Node.RefIndex.valueAllowNull(.null)),
+                        @bitCast(Ast.RefIndex.valueAllowNull(.null)),
                     ),
                 }
 
@@ -1192,7 +1192,7 @@ const TokEnd = enum {
 
 const RefIdxTripletResult = struct {
     loc: Lexer.Token.Loc,
-    value: Ast.Node.FaceTriplet,
+    value: Ast.FaceTriplet,
 };
 
 const ExpectRefIdxTripletError =
@@ -1374,7 +1374,7 @@ fn expectRefIdxTriplet(
             .loc = full_loc,
         });
     };
-    const vt: Ast.Node.RefIndex = vt: {
+    const vt: Ast.RefIndex = vt: {
         const vt_raw = vt_raw_opt orelse break :vt .null;
         break :vt parseRefIdxFromRawInt(
             vt_raw,
@@ -1397,7 +1397,7 @@ fn expectRefIdxTriplet(
             .loc = full_loc,
         });
     };
-    const vn: Ast.Node.RefIndex = vn: {
+    const vn: Ast.RefIndex = vn: {
         const vn_raw = vn_raw_opt orelse break :vn .null;
         break :vn parseRefIdxFromRawInt(
             vn_raw,
@@ -1408,7 +1408,7 @@ fn expectRefIdxTriplet(
         });
     };
 
-    const triplet: Ast.Node.FaceTriplet = .{
+    const triplet: Ast.FaceTriplet = .{
         .v = v,
         .vt = vt,
         .vn = vn,
@@ -1421,16 +1421,16 @@ fn expectRefIdxTriplet(
 }
 
 const IntOneBasedMaybeNeg = std.math.IntFittingRange(
-    -std.math.maxInt(Ast.Node.RefIndex.Int),
-    std.math.maxInt(Ast.Node.RefIndex.Int),
+    -std.math.maxInt(Ast.RefIndex.Int),
+    std.math.maxInt(Ast.RefIndex.Int),
 );
 
 fn parseRefIdxFromRawInt(
     int_raw: IntOneBasedMaybeNeg,
     end_index: Ast.Node.Index,
-) ?Ast.Node.RefIndex {
-    const ref_idx: Ast.Node.RefIndex = ref_idx: {
-        if (int_raw == 0 or int_raw > std.math.maxInt(Ast.Node.RefIndex.Int) + 1) {
+) ?Ast.RefIndex {
+    const ref_idx: Ast.RefIndex = ref_idx: {
+        if (int_raw == 0 or int_raw > std.math.maxInt(Ast.RefIndex.Int) + 1) {
             return null;
         }
 
@@ -1615,7 +1615,7 @@ const StringIter = struct {
 fn zipUpFaceTriplet(
     gpa: std.mem.Allocator,
     extra: *std.ArrayListUnmanaged(u32),
-    triplet: Ast.Node.FaceTriplet,
+    triplet: Ast.FaceTriplet,
     want_extra_capacity: enum {
         no_reserve_capacity_for_null_sentinel,
         do_reserve_capacity_for_null_sentinel,

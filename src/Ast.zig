@@ -270,144 +270,6 @@ pub const Node = struct {
         };
     };
 
-    /// Reference to an indexed vertex data.
-    /// 0-based reference to enumerated vertex data.
-    pub const RefIndex = enum(Int) {
-        pub const Int = u32;
-        null = std.math.maxInt(Int),
-        _,
-
-        /// Asserts `self != .null`, and returns `self`.
-        pub fn nonNull(self: RefIndex) RefIndex {
-            std.debug.assert(self != .null);
-            return self;
-        }
-
-        pub fn from(int: Int) RefIndex {
-            return @enumFromInt(int);
-        }
-
-        pub const OneBased = std.math.IntFittingRange(
-            1,
-            std.math.maxInt(Int) + 1,
-        );
-        /// Asserts `int != 0`.
-        /// Asserts `int <= std.math.maxInt(Int) + 1`.
-        pub fn fromOneBased(int: OneBased) RefIndex {
-            std.debug.assert(int != 0);
-            const casted: Int = @intCast(int - 1);
-            return @enumFromInt(casted);
-        }
-
-        pub fn value(self: RefIndex) ?Int {
-            return switch (self) {
-                .null => null,
-                else => @intFromEnum(self),
-            };
-        }
-
-        pub fn valueAllowNull(self: RefIndex) Int {
-            return @intFromEnum(self);
-        }
-
-        pub fn emptyIfNullFmt(self: RefIndex) EmptyIfNullFmt {
-            return .{ .ref_index = self };
-        }
-
-        pub const EmptyIfNullFmt = packed struct {
-            ref_index: RefIndex,
-
-            pub fn format(
-                self: EmptyIfNullFmt,
-                comptime fmt_str: []const u8,
-                fmt_options: std.fmt.FormatOptions,
-                writer: anytype,
-            ) @TypeOf(writer).Error!void {
-                switch (self.ref_index) {
-                    .null => try writer.writeAll(""),
-                    _ => |non_null| try std.fmt.formatIntValue(
-                        non_null.value().? + 1,
-                        fmt_str,
-                        fmt_options,
-                        writer,
-                    ),
-                }
-            }
-        };
-
-        pub const ListFmt = union(FaceTriplet.Layout) {
-            vertex_only: []const RefIndex,
-            only_vt: []const [2]RefIndex,
-            only_vn: []const [2]RefIndex,
-            both_vt_vn: []const [3]RefIndex,
-
-            pub fn format(
-                self: ListFmt,
-                comptime fmt_str: []const u8,
-                fmt_options: std.fmt.FormatOptions,
-                writer: anytype,
-            ) @TypeOf(writer).Error!void {
-                switch (self) {
-                    inline else => |indices, tag| for (indices, 0..) |index_or_list, triplet_i| {
-                        if (triplet_i != 0) try writer.writeAll(" ");
-                        switch (tag) {
-                            .vertex_only => {
-                                try index_or_list.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
-                            },
-                            .only_vt => for (index_or_list, 0..) |ref_index, ref_index_i| {
-                                if (ref_index_i != 0) try writer.writeAll("/");
-                                try ref_index.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
-                            },
-                            .only_vn => for (index_or_list, 0..) |ref_index, ref_index_i| {
-                                if (ref_index_i != 0) try writer.writeAll("//");
-                                try ref_index.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
-                            },
-                            .both_vt_vn => for (index_or_list, 0..) |ref_index, ref_index_i| {
-                                if (ref_index_i != 0) try writer.writeAll("/");
-                                try ref_index.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
-                            },
-                        }
-                    },
-                }
-            }
-        };
-    };
-
-    pub const FaceTriplet = struct {
-        /// Cannot be `.null`.
-        v: Node.RefIndex,
-        vt: Node.RefIndex,
-        vn: Node.RefIndex,
-
-        pub const Layout = enum {
-            /// `v`
-            vertex_only,
-            /// `v/vt`
-            only_vt,
-            /// `v//vn`
-            only_vn,
-            /// `v/vt/vn`
-            both_vt_vn,
-
-            pub fn zippedLength(self: Layout) u2 {
-                return switch (self) {
-                    .vertex_only => 1,
-                    .only_vt => 2,
-                    .only_vn => 2,
-                    .both_vt_vn => 3,
-                };
-            }
-        };
-
-        pub fn layout(self: FaceTriplet) Layout {
-            _ = self.v.nonNull();
-            if (self.vt == .null and self.vn == .null) return .vertex_only;
-            if (self.vt == .null) return .only_vn;
-            if (self.vn == .null) return .only_vt;
-            return .both_vt_vn;
-        }
-    };
-
     pub const Unzipped = union(Tag) {
         call: Call,
         call_no_args: StrSet.Index,
@@ -793,6 +655,144 @@ pub const Node = struct {
     };
 };
 
+/// Reference to an indexed vertex data.
+/// 0-based reference to enumerated vertex data.
+pub const RefIndex = enum(Int) {
+    pub const Int = u32;
+    null = std.math.maxInt(Int),
+    _,
+
+    /// Asserts `self != .null`, and returns `self`.
+    pub fn nonNull(self: RefIndex) RefIndex {
+        std.debug.assert(self != .null);
+        return self;
+    }
+
+    pub fn from(int: Int) RefIndex {
+        return @enumFromInt(int);
+    }
+
+    pub const OneBased = std.math.IntFittingRange(
+        1,
+        std.math.maxInt(Int) + 1,
+    );
+    /// Asserts `int != 0`.
+    /// Asserts `int <= std.math.maxInt(Int) + 1`.
+    pub fn fromOneBased(int: OneBased) RefIndex {
+        std.debug.assert(int != 0);
+        const casted: Int = @intCast(int - 1);
+        return @enumFromInt(casted);
+    }
+
+    pub fn value(self: RefIndex) ?Int {
+        return switch (self) {
+            .null => null,
+            else => @intFromEnum(self),
+        };
+    }
+
+    pub fn valueAllowNull(self: RefIndex) Int {
+        return @intFromEnum(self);
+    }
+
+    pub fn emptyIfNullFmt(self: RefIndex) EmptyIfNullFmt {
+        return .{ .ref_index = self };
+    }
+
+    pub const EmptyIfNullFmt = packed struct {
+        ref_index: RefIndex,
+
+        pub fn format(
+            self: EmptyIfNullFmt,
+            comptime fmt_str: []const u8,
+            fmt_options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) @TypeOf(writer).Error!void {
+            switch (self.ref_index) {
+                .null => try writer.writeAll(""),
+                _ => |non_null| try std.fmt.formatIntValue(
+                    non_null.value().? + 1,
+                    fmt_str,
+                    fmt_options,
+                    writer,
+                ),
+            }
+        }
+    };
+
+    pub const ListFmt = union(FaceTriplet.Layout) {
+        vertex_only: []const RefIndex,
+        only_vt: []const [2]RefIndex,
+        only_vn: []const [2]RefIndex,
+        both_vt_vn: []const [3]RefIndex,
+
+        pub fn format(
+            self: ListFmt,
+            comptime fmt_str: []const u8,
+            fmt_options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) @TypeOf(writer).Error!void {
+            switch (self) {
+                inline else => |indices, tag| for (indices, 0..) |index_or_list, triplet_i| {
+                    if (triplet_i != 0) try writer.writeAll(" ");
+                    switch (tag) {
+                        .vertex_only => {
+                            try index_or_list.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
+                        },
+                        .only_vt => for (index_or_list, 0..) |ref_index, ref_index_i| {
+                            if (ref_index_i != 0) try writer.writeAll("/");
+                            try ref_index.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
+                        },
+                        .only_vn => for (index_or_list, 0..) |ref_index, ref_index_i| {
+                            if (ref_index_i != 0) try writer.writeAll("//");
+                            try ref_index.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
+                        },
+                        .both_vt_vn => for (index_or_list, 0..) |ref_index, ref_index_i| {
+                            if (ref_index_i != 0) try writer.writeAll("/");
+                            try ref_index.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
+                        },
+                    }
+                },
+            }
+        }
+    };
+};
+
+pub const FaceTriplet = struct {
+    /// Cannot be `.null`.
+    v: RefIndex,
+    vt: RefIndex,
+    vn: RefIndex,
+
+    pub const Layout = enum {
+        /// `v`
+        vertex_only,
+        /// `v/vt`
+        only_vt,
+        /// `v//vn`
+        only_vn,
+        /// `v/vt/vn`
+        both_vt_vn,
+
+        pub fn zippedLength(self: Layout) u2 {
+            return switch (self) {
+                .vertex_only => 1,
+                .only_vt => 2,
+                .only_vn => 2,
+                .both_vt_vn => 3,
+            };
+        }
+    };
+
+    pub fn layout(self: FaceTriplet) Layout {
+        _ = self.v.nonNull();
+        if (self.vt == .null and self.vn == .null) return .vertex_only;
+        if (self.vt == .null) return .only_vn;
+        if (self.vn == .null) return .only_vt;
+        return .both_vt_vn;
+    }
+};
+
 pub fn full(self: Ast, node_index: Node.Index) Node.Full {
     const node_tag: Node.Tag = self.nodes.items(.tag)[node_index];
     const node_data: *const Node.Data = &self.nodes.items(.data)[node_index];
@@ -955,19 +955,19 @@ fn strListSliceToNull(ast: Ast, index: u32) []const Ast.StrSet.Index {
     return std.mem.sliceTo(elemCast(Ast.StrSet.Index, ast.extra[index..]), .null);
 }
 
-fn refIdxListSliceToNull(ast: Ast, index: u32) []const Ast.Node.RefIndex {
-    return std.mem.sliceTo(elemCast(Ast.Node.RefIndex, ast.extra[index..]), .null);
+fn refIdxListSliceToNull(ast: Ast, index: u32) []const Ast.RefIndex {
+    return std.mem.sliceTo(elemCast(Ast.RefIndex, ast.extra[index..]), .null);
 }
 
 fn multiFaceList(
     self: Ast,
     index: u32,
-    comptime layout: Node.FaceTriplet.Layout,
-) []const if (layout.zippedLength() != 1) [layout.zippedLength()]Node.RefIndex else Node.RefIndex {
-    const raw: []const Node.RefIndex = self.refIdxListSliceToNull(index);
+    comptime layout: FaceTriplet.Layout,
+) []const if (layout.zippedLength() != 1) [layout.zippedLength()]RefIndex else RefIndex {
+    const raw: []const RefIndex = self.refIdxListSliceToNull(index);
     const elem_len = comptime layout.zippedLength();
     std.debug.assert(raw.len % elem_len == 0);
-    const Elem = if (elem_len == 1) Node.RefIndex else [elem_len]Node.RefIndex;
+    const Elem = if (elem_len == 1) RefIndex else [elem_len]RefIndex;
     return elemCast(Elem, raw);
 }
 
@@ -1025,30 +1025,30 @@ const TestUnzippedNode = union(Node.Tag) {
 
     s: []const u8,
 
-    f_one_v: Node.RefIndex,
-    f_one_v_vt: [2]Node.RefIndex,
-    f_one_v_vn: [2]Node.RefIndex,
-    f_one_v_vt_vn: [3]Node.RefIndex,
+    f_one_v: RefIndex,
+    f_one_v_vt: [2]RefIndex,
+    f_one_v_vn: [2]RefIndex,
+    f_one_v_vt_vn: [3]RefIndex,
 
-    f_two_v: [2]Node.RefIndex,
-    f_two_v_vt: [2][2]Node.RefIndex,
-    f_two_v_vn: [2][2]Node.RefIndex,
-    f_two_v_vt_vn: [2][3]Node.RefIndex,
+    f_two_v: [2]RefIndex,
+    f_two_v_vt: [2][2]RefIndex,
+    f_two_v_vn: [2][2]RefIndex,
+    f_two_v_vt_vn: [2][3]RefIndex,
 
-    f_three_v: [3]Node.RefIndex,
-    f_three_v_vt: [3][2]Node.RefIndex,
-    f_three_v_vn: [3][2]Node.RefIndex,
-    f_three_v_vt_vn: [3][3]Node.RefIndex,
+    f_three_v: [3]RefIndex,
+    f_three_v_vt: [3][2]RefIndex,
+    f_three_v_vn: [3][2]RefIndex,
+    f_three_v_vt_vn: [3][3]RefIndex,
 
-    f_four_v: [4]Node.RefIndex,
-    f_four_v_vt: [4][2]Node.RefIndex,
-    f_four_v_vn: [4][2]Node.RefIndex,
-    f_four_v_vt_vn: [4][3]Node.RefIndex,
+    f_four_v: [4]RefIndex,
+    f_four_v_vt: [4][2]RefIndex,
+    f_four_v_vn: [4][2]RefIndex,
+    f_four_v_vt_vn: [4][3]RefIndex,
 
-    f_multi_v: []const Node.RefIndex,
-    f_multi_v_vt: []const [2]Node.RefIndex,
-    f_multi_v_vn: []const [2]Node.RefIndex,
-    f_multi_v_vt_vn: []const [3]Node.RefIndex,
+    f_multi_v: []const RefIndex,
+    f_multi_v_vt: []const [2]RefIndex,
+    f_multi_v_vn: []const [2]RefIndex,
+    f_multi_v_vt_vn: []const [3]RefIndex,
 };
 
 fn testAstParse(
@@ -1106,20 +1106,20 @@ fn testAstParse(
                         try strIndicesToStrings(node_arena, ast.str_set, payload.args),
                     },
 
-                    Node.RefIndex,
-                    [2]Node.RefIndex,
-                    [3]Node.RefIndex,
-                    [2][2]Node.RefIndex,
-                    [2][3]Node.RefIndex,
-                    [3][2]Node.RefIndex,
-                    [3][3]Node.RefIndex,
-                    [4]Node.RefIndex,
-                    [4][2]Node.RefIndex,
-                    [4][3]Node.RefIndex,
+                    RefIndex,
+                    [2]RefIndex,
+                    [3]RefIndex,
+                    [2][2]RefIndex,
+                    [2][3]RefIndex,
+                    [3][2]RefIndex,
+                    [3][3]RefIndex,
+                    [4]RefIndex,
+                    [4][2]RefIndex,
+                    [4][3]RefIndex,
 
-                    []const Node.RefIndex,
-                    []const [2]Node.RefIndex,
-                    []const [3]Node.RefIndex,
+                    []const RefIndex,
+                    []const [2]RefIndex,
+                    []const [3]RefIndex,
                     => payload,
 
                     else => |T| @compileError(@typeName(T)),
@@ -1154,7 +1154,7 @@ const TestDiagnostic = union(ParseDiagnostic.Tagged.Tag) {
             /// line
             u32,
             /// layout
-            Node.FaceTriplet.Layout,
+            FaceTriplet.Layout,
             /// src
             []const u8,
         };
@@ -1208,20 +1208,20 @@ fn testAstDiagnostic(
                         },
                         TestDiagnostic.MixedFaceLayoutsPayload => {
                             const expected_first_line: u32, //
-                            const expected_first_layout: Node.FaceTriplet.Layout, //
+                            const expected_first_layout: FaceTriplet.Layout, //
                             const expected_first_src: []const u8 //
                             = expected_pl.first;
                             const expected_bad_line: u32, //
-                            const expected_bad_layout: Node.FaceTriplet.Layout, //
+                            const expected_bad_layout: FaceTriplet.Layout, //
                             const expected_bad_src: []const u8 //
                             = expected_pl.bad;
 
                             const actual_first_line: u32, //
-                            const actual_first_layout: Node.FaceTriplet.Layout, //
+                            const actual_first_layout: FaceTriplet.Layout, //
                             const actual_first_src: []const u8 //
                             = actual_pl.first;
                             const actual_bad_line: u32, //
-                            const actual_bad_layout: Node.FaceTriplet.Layout, //
+                            const actual_bad_layout: FaceTriplet.Layout, //
                             const actual_bad_src: []const u8 //
                             = actual_pl.bad;
 

@@ -21,6 +21,13 @@ pub const Index = enum(Int) {
     pub fn valueAllowNull(self: Index) Int {
         return @intFromEnum(self);
     }
+
+    pub fn nonNull(self: Index) ?Index {
+        return switch (self) {
+            .null => null,
+            else => |val| val,
+        };
+    }
 };
 
 const Hasher = std.hash.Wyhash;

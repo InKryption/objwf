@@ -272,9 +272,9 @@ pub const Node = struct {
 
     pub const Unzipped = union(Tag) {
         call: Call,
-        call_no_args: StrSet.Index,
+        call_no_args: *const StrSet.Index,
 
-        mtllib_one: StrSet.Index,
+        mtllib_one: *const StrSet.Index,
         mtllib_multi: []const StrSet.Index,
 
         usemtl: StrSet.Index,
@@ -301,30 +301,30 @@ pub const Node = struct {
         deg_surface: [2]StrSet.Index,
 
         g_empty,
-        g_single: StrSet.Index,
+        g_single: *const StrSet.Index,
         g_multi: []const StrSet.Index,
 
         s: StrSet.Index,
 
-        f_one_v: RefIndex,
-        f_one_v_vt: [2]RefIndex,
-        f_one_v_vn: [2]RefIndex,
-        f_one_v_vt_vn: [3]RefIndex,
+        f_one_v: *const RefIndex,
+        f_one_v_vt: *const [2]RefIndex,
+        f_one_v_vn: *const [2]RefIndex,
+        f_one_v_vt_vn: *const [3]RefIndex,
 
-        f_two_v: [2]RefIndex,
-        f_two_v_vt: [2][2]RefIndex,
-        f_two_v_vn: [2][2]RefIndex,
-        f_two_v_vt_vn: [2][3]RefIndex,
+        f_two_v: *const [2]RefIndex,
+        f_two_v_vt: *const [2][2]RefIndex,
+        f_two_v_vn: *const [2][2]RefIndex,
+        f_two_v_vt_vn: *const [2][3]RefIndex,
 
-        f_three_v: [3]RefIndex,
-        f_three_v_vt: [3][2]RefIndex,
-        f_three_v_vn: [3][2]RefIndex,
-        f_three_v_vt_vn: [3][3]RefIndex,
+        f_three_v: *const [3]RefIndex,
+        f_three_v_vt: *const [3][2]RefIndex,
+        f_three_v_vn: *const [3][2]RefIndex,
+        f_three_v_vt_vn: *const [3][3]RefIndex,
 
-        f_four_v: [4]RefIndex,
-        f_four_v_vt: [4][2]RefIndex,
-        f_four_v_vn: [4][2]RefIndex,
-        f_four_v_vt_vn: [4][3]RefIndex,
+        f_four_v: *const [4]RefIndex,
+        f_four_v_vt: *const [4][2]RefIndex,
+        f_four_v_vn: *const [4][2]RefIndex,
+        f_four_v_vt_vn: *const [4][3]RefIndex,
 
         f_multi_v: []const RefIndex,
         f_multi_v_vt: []const [2]RefIndex,
@@ -334,154 +334,80 @@ pub const Node = struct {
         pub const Call = struct {
             argv: []const StrSet.Index,
 
+            /// May be null.
             pub fn filename(call: Call) StrSet.Index {
-                return call.argv[0];
+                return if (call.argv.len != 0) call.argv[0] else .null;
             }
 
+            /// May be empty.
             pub fn args(call: Call) []const StrSet.Index {
-                return call.argv[1..];
+                const start = @intFromBool(call.argv.len != 0);
+                return call.argv[start..];
             }
         };
+
+        pub fn full(self: Unzipped) Full {
+            return switch (self) {
+                .call => |call| .{ .call = call },
+                .call_no_args => |filename| .{ .call = .{ .argv = filename[0..1] } },
+
+                .mtllib_one => |lib| .{ .mtllib = lib[0..1] },
+                .mtllib_multi => |libs| .{ .mtllib = libs },
+                .usemtl => |mtl| .{ .usemtl = mtl },
+
+                .o => |name| .{ .o = name },
+
+                .v_xyz => |xyz| .{ .v = xyz ++ .{.null} },
+                .v_xyzw => |xyzw| .{ .v = xyzw },
+
+                .vn_ijk => |ijk| .{ .vn = ijk },
+
+                .vp_u => |u| .{ .vp = .{ u, .null, .null } },
+                .vp_uv => |uv| .{ .vp = uv ++ .{.null} },
+                .vp_uvw => |uvw| .{ .vp = uvw },
+
+                .vt_u => |u| .{ .vt = .{ u, .null, .null } },
+                .vt_uv => |uv| .{ .vt = uv ++ .{.null} },
+                .vt_uvw => |uvw| .{ .vt = uvw },
+
+                .cstype => |cstype| .{ .cstype = cstype },
+
+                .deg_curve => |degu| .{ .deg = .{ degu, .null } },
+                .deg_surface => |deguv| .{ .deg = deguv },
+
+                .g_empty => .{ .g = &.{} },
+                .g_single => |group| .{ .g = group[0..1] },
+                .g_multi => |groups| .{ .g = groups },
+
+                .s => |group_number| .{ .s = group_number },
+
+                .f_one_v => |one_v| .{ .f = .{ .vertex_only = @as(*const RefIndex, one_v)[0..1] } },
+                .f_one_v_vt => |one_v_vt| .{ .f = .{ .only_vt = @ptrCast(one_v_vt) } },
+                .f_one_v_vn => |one_v_vn| .{ .f = .{ .only_vn = @ptrCast(one_v_vn) } },
+                .f_one_v_vt_vn => |one_v_vt_vn| .{ .f = .{ .both_vt_vn = @ptrCast(one_v_vt_vn) } },
+
+                .f_two_v => |two_v| .{ .f = .{ .vertex_only = two_v } },
+                .f_two_v_vt => |two_v_vt| .{ .f = .{ .only_vt = two_v_vt } },
+                .f_two_v_vn => |two_v_vn| .{ .f = .{ .only_vn = two_v_vn } },
+                .f_two_v_vt_vn => |two_v_vt_vn| .{ .f = .{ .both_vt_vn = two_v_vt_vn } },
+
+                .f_three_v => |three_v| .{ .f = .{ .vertex_only = three_v } },
+                .f_three_v_vt => |three_v_vt| .{ .f = .{ .only_vt = three_v_vt } },
+                .f_three_v_vn => |three_v_vn| .{ .f = .{ .only_vn = three_v_vn } },
+                .f_three_v_vt_vn => |three_v_vt_vn| .{ .f = .{ .both_vt_vn = three_v_vt_vn } },
+
+                .f_four_v => |four_v| .{ .f = .{ .vertex_only = four_v } },
+                .f_four_v_vt => |four_v_vt| .{ .f = .{ .only_vt = four_v_vt } },
+                .f_four_v_vn => |four_v_vn| .{ .f = .{ .only_vn = four_v_vn } },
+                .f_four_v_vt_vn => |four_v_vt_vn| .{ .f = .{ .both_vt_vn = four_v_vt_vn } },
+
+                .f_multi_v => |multi_v| .{ .f = .{ .vertex_only = multi_v } },
+                .f_multi_v_vt => |multi_v_vt| .{ .f = .{ .only_vt = multi_v_vt } },
+                .f_multi_v_vn => |multi_v_vn| .{ .f = .{ .only_vn = multi_v_vn } },
+                .f_multi_v_vt_vn => |multi_v_vt_vn| .{ .f = .{ .both_vt_vn = multi_v_vt_vn } },
+            };
+        }
     };
-
-    pub fn unzipped(node: Node, ast: Ast) Unzipped {
-        return switch (node.tag) {
-            .g_empty,
-            => .g_empty,
-
-            .cstype,
-            => .{ .cstype = node.data.cstype.value },
-
-            .g_multi,
-            => .{ .g_multi = ast.strListSliceToNull(node.data.index) },
-
-            .call,
-            => .{ .call = .{
-                .argv = ast.strListSliceToNull(node.data.index),
-            } },
-
-            .mtllib_one => .{ .mtllib_one = node.data.string },
-            .mtllib_multi => .{ .mtllib_multi = ast.strListSliceToNull(node.data.index) },
-            .usemtl => .{ .usemtl = node.data.string },
-
-            inline //
-            .vp_u,
-            .vt_u,
-            .deg_curve,
-            => |tag| @unionInit(Unzipped, @tagName(tag), node.data.value),
-
-            inline //
-            .o,
-            .s,
-            .call_no_args,
-            .g_single,
-            => |tag| @unionInit(Unzipped, @tagName(tag), node.data.string),
-
-            inline //
-            .deg_surface,
-
-            .v_xyz,
-            .v_xyzw,
-
-            .vp_uv,
-            .vp_uvw,
-
-            .vt_uv,
-            .vt_uvw,
-
-            .vn_ijk,
-            => |tag| blk: {
-                const len = comptime switch (tag) {
-                    .deg_surface => 2,
-
-                    .v_xyz => 3,
-                    .v_xyzw => 4,
-
-                    .vp_uv => 2,
-                    .vp_uvw => 3,
-
-                    .vt_uv => 2,
-                    .vt_uvw => 3,
-
-                    .vn_ijk => 3,
-                    else => unreachable,
-                };
-                const data: *const [len]StrSet.Index =
-                    elemCast(StrSet.Index, ast.extra[node.data.index..][0..len]);
-                break :blk @unionInit(Unzipped, @tagName(tag), data.*);
-            },
-
-            inline //
-            .f_one_v,
-            .f_one_v_vt,
-            .f_one_v_vn,
-            .f_one_v_vt_vn,
-
-            .f_two_v,
-            .f_two_v_vt,
-            .f_two_v_vn,
-            .f_two_v_vt_vn,
-
-            .f_three_v,
-            .f_three_v_vt,
-            .f_three_v_vn,
-            .f_three_v_vt_vn,
-
-            .f_four_v,
-            .f_four_v_vt,
-            .f_four_v_vn,
-            .f_four_v_vt_vn,
-            => |tag| blk: {
-                const len, const elem_size = comptime switch (tag) {
-                    // zig fmt: off
-                    .f_one_v         => .{ 1, 1 },
-                    .f_one_v_vt      => .{ 1, 2 },
-                    .f_one_v_vn      => .{ 1, 2 },
-                    .f_one_v_vt_vn   => .{ 1, 3 },
-
-                    .f_two_v         => .{ 2, 1 },
-                    .f_two_v_vt      => .{ 2, 2 },
-                    .f_two_v_vn      => .{ 2, 2 },
-                    .f_two_v_vt_vn   => .{ 2, 3 },
-
-                    .f_three_v       => .{ 3, 1 },
-                    .f_three_v_vt    => .{ 3, 2 },
-                    .f_three_v_vn    => .{ 3, 2 },
-                    .f_three_v_vt_vn => .{ 3, 3 },
-
-                    .f_four_v        => .{ 4, 1 },
-                    .f_four_v_vt     => .{ 4, 2 },
-                    .f_four_v_vn     => .{ 4, 2 },
-                    .f_four_v_vt_vn  => .{ 4, 3 },
-                    else => unreachable,
-                    // zig fmt: on
-                };
-                const Elem = if (elem_size == 1) RefIndex else [elem_size]RefIndex;
-                const data: *const [len]Elem = elemCast(Elem, ast.extra[node.data.index..][0..len]);
-                break :blk @unionInit(Unzipped, @tagName(tag), if (len == 1) data[0] else data.*);
-            },
-
-            inline //
-            .f_multi_v,
-            .f_multi_v_vt,
-            .f_multi_v_vn,
-            .f_multi_v_vt_vn,
-            => |tag| blk: {
-                const layout: FaceTriplet.Layout = comptime switch (tag) {
-                    .f_multi_v => .vertex_only,
-                    .f_multi_v_vt => .only_vt,
-                    .f_multi_v_vn => .only_vn,
-                    .f_multi_v_vt_vn => .both_vt_vn,
-                    else => unreachable,
-                };
-                break :blk @unionInit(
-                    Unzipped,
-                    @tagName(tag),
-                    ast.multiFaceList(node.data.index, layout),
-                );
-            },
-        };
-    }
 
     pub const Full = union(Prefix) {
         call: Unzipped.Call,
@@ -507,10 +433,16 @@ pub const Node = struct {
         /// w may be null.
         vt: [3]StrSet.Index,
         cstype: CsType,
-        deg: Deg,
+        /// degu, degv = deg
+        /// degu is never null.
+        /// degv may be null.
+        ///
+        /// if degv is null, it's a curve.
+        /// if degv is not null, it's a surface.
+        deg: [2]StrSet.Index,
         g: []const StrSet.Index,
         s: StrSet.Index,
-        f: Face,
+        f: FaceList,
 
         pub const Prefix = enum {
             call,
@@ -528,12 +460,7 @@ pub const Node = struct {
             f,
         };
 
-        pub const Deg = union(enum) {
-            curve: StrSet.Index,
-            surface: [2]StrSet.Index,
-        };
-
-        pub const Face = union(FaceTriplet.Layout) {
+        pub const FaceList = union(FaceTriplet.Layout) {
             /// `v`
             vertex_only: []const RefIndex,
             /// `v/vt`
@@ -554,9 +481,11 @@ pub const RefIndex = enum(Int) {
     _,
 
     /// Asserts `self != .null`, and returns `self`.
-    pub fn nonNull(self: RefIndex) RefIndex {
-        std.debug.assert(self != .null);
-        return self;
+    pub fn nonNull(self: RefIndex) ?RefIndex {
+        return switch (self) {
+            .null => null,
+            else => |val| val,
+        };
     }
 
     pub fn from(int: Int) RefIndex {
@@ -611,14 +540,14 @@ pub const RefIndex = enum(Int) {
         }
     };
 
-    pub const ListFmt = union(FaceTriplet.Layout) {
+    pub const NullTerminatedListFmt = union(FaceTriplet.Layout) {
         vertex_only: []const RefIndex,
         only_vt: []const [2]RefIndex,
         only_vn: []const [2]RefIndex,
         both_vt_vn: []const [3]RefIndex,
 
         pub fn format(
-            self: ListFmt,
+            self: NullTerminatedListFmt,
             comptime fmt_str: []const u8,
             fmt_options: std.fmt.FormatOptions,
             writer: anytype,
@@ -676,83 +605,13 @@ pub const FaceTriplet = struct {
     };
 
     pub fn layout(self: FaceTriplet) Layout {
-        _ = self.v.nonNull();
+        std.debug.assert(self.v != .null);
         if (self.vt == .null and self.vn == .null) return .vertex_only;
         if (self.vt == .null) return .only_vn;
         if (self.vn == .null) return .only_vt;
         return .both_vt_vn;
     }
 };
-
-pub fn full(self: Ast, node_index: Node.Index) Node.Full {
-    const node_tag: Node.Tag = self.nodes.items(.tag)[node_index];
-    const node_data: *const Node.Data = &self.nodes.items(.data)[node_index];
-    return switch (node_tag) {
-        .call => .{ .call = .{
-            .filename = .from(self.extra[node_data.index]),
-            .args = self.strListSliceToNull(node_data.index + 1),
-        } },
-        .call_no_args => .{ .call = .{
-            .filename = .from(self.extra[node_data.index]),
-            .args = &.{},
-        } },
-
-        .mtllib_one => .{ .mtllib = (&node_data.string)[0..1] },
-        .mtllib_multi => .{ .mtllib = self.strListSliceToNull(node_data.index) },
-        .usemtl => .{ .usemtl = node_data.string },
-
-        .o => .{ .o = node_data.string },
-
-        .v_xyz => .{ .v = elemCast(StrSet.Index, self.extra[node_data.index..][0..3]).* ++ .{.null} },
-        .v_xyzw => .{ .v = elemCast(StrSet.Index, self.extra[node_data.index..][0..4]).* },
-
-        .vn_ijk => .{ .vn = elemCast(StrSet.Index, self.extra[node_data.index..][0..3]).* },
-
-        .vp_u => .{ .vp = .{ node_data.string, .null, .null } },
-        .vp_uv => .{ .vp = elemCast(StrSet.Index, self.extra[node_data.index..][0..2]).* ++ .{.null} },
-        .vp_uvw => .{ .vp = elemCast(StrSet.Index, self.extra[node_data.index..][0..3]).* },
-
-        .vt_u => .{ .vt = .{ node_data.string, .null, .null } },
-        .vt_uv => .{ .vt = elemCast(StrSet.Index, self.extra[node_data.index..][0..2]).* ++ .{.null} },
-        .vt_uvw => .{ .vt = elemCast(StrSet.Index, self.extra[node_data.index..][0..3]).* },
-
-        .cstype => .{ .cstype = node_data.cstype.value },
-
-        .deg_curve => .{ .deg = .{ .curve = node_data.value } },
-        .deg_surface => .{ .deg = .{ .surface = elemCast(StrSet.Index, self.extra[node_data.index..][0..2]).* } },
-
-        .g_empty => .{ .g = &.{} },
-        .g_single => .{ .g = (&node_data.string)[0..1] },
-        .g_multi => .{ .g = self.strListSliceToNull(node_data.index) },
-
-        .s => .{ .s = node_data.string },
-
-        .f_one_v => .{ .f = .{ .vertex_only = (&node_data.ref_index)[0..1] } },
-        .f_one_v_vt => .{ .f = .{ .only_vt = @ptrCast(self.extra[node_data.index..][0..2]) } },
-        .f_one_v_vn => .{ .f = .{ .only_vn = @ptrCast(self.extra[node_data.index..][0..2]) } },
-        .f_one_v_vt_vn => .{ .f = .{ .both_vt_vn = @ptrCast(self.extra[node_data.index..][0..3]) } },
-
-        .f_two_v => .{ .f = .{ .vertex_only = @ptrCast(self.extra[node_data.index..][0..2]) } },
-        .f_two_v_vt => .{ .f = .{ .only_vt = @ptrCast(self.extra[node_data.index..][0..4]) } },
-        .f_two_v_vn => .{ .f = .{ .only_vn = @ptrCast(self.extra[node_data.index..][0..4]) } },
-        .f_two_v_vt_vn => .{ .f = .{ .both_vt_vn = @ptrCast(self.extra[node_data.index..][0..6]) } },
-
-        .f_three_v => .{ .f = .{ .vertex_only = @ptrCast(self.extra[node_data.index..][0..3]) } },
-        .f_three_v_vt => .{ .f = .{ .only_vt = @ptrCast(self.extra[node_data.index..][0..6]) } },
-        .f_three_v_vn => .{ .f = .{ .only_vn = @ptrCast(self.extra[node_data.index..][0..6]) } },
-        .f_three_v_vt_vn => .{ .f = .{ .both_vt_vn = @ptrCast(self.extra[node_data.index..][0..9]) } },
-
-        .f_four_v => .{ .f = .{ .vertex_only = @ptrCast(self.extra[node_data.index..][0..4]) } },
-        .f_four_v_vt => .{ .f = .{ .only_vt = @ptrCast(self.extra[node_data.index..][0..8]) } },
-        .f_four_v_vn => .{ .f = .{ .only_vn = @ptrCast(self.extra[node_data.index..][0..8]) } },
-        .f_four_v_vt_vn => .{ .f = .{ .both_vt_vn = @ptrCast(self.extra[node_data.index..][0..12]) } },
-
-        .f_multi_v => .{ .f = .{ .vertex_only = self.multiFaceList(node_data.index, .vertex_only) } },
-        .f_multi_v_vt => .{ .f = .{ .only_vt = self.multiFaceList(node_data.index, .only_vt) } },
-        .f_multi_v_vn => .{ .f = .{ .only_vn = self.multiFaceList(node_data.index, .only_vn) } },
-        .f_multi_v_vt_vn => .{ .f = .{ .both_vt_vn = self.multiFaceList(node_data.index, .both_vt_vn) } },
-    };
-}
 
 pub const Indices = struct {
     list: []const Node.Index,
@@ -799,14 +658,14 @@ pub const Indices = struct {
         /// Returns null for the last field, where the list is `list[offsets.<start_field>..]`.
         pub fn endFieldOf(start_field: FieldTag) ?FieldTag {
             return switch (start_field) {
-                .positions,
-                => .textures,
+                .positions => //
                 .textures,
-                => .normals,
+                .textures => //
                 .normals,
-                => .parameter_spaces,
+                .normals => //
                 .parameter_spaces,
-                => null,
+                .parameter_spaces => //
+                null,
             };
         }
     };
@@ -841,6 +700,153 @@ pub const Indices = struct {
         };
     };
 };
+
+pub fn unzipped(ast: Ast, node_index: Node.Index) Node.Unzipped {
+    const node_tag: *const Node.Tag = &ast.nodes.items(.tag)[node_index];
+    const node_data: *const Node.Data = &ast.nodes.items(.data)[node_index];
+    return switch (node_tag.*) {
+        .g_empty,
+        => .g_empty,
+
+        .cstype,
+        => .{ .cstype = node_data.cstype.value },
+
+        .g_multi,
+        => .{ .g_multi = ast.strListSliceToNull(node_data.index) },
+
+        .call,
+        => .{ .call = .{
+            .argv = ast.strListSliceToNull(node_data.index),
+        } },
+
+        .mtllib_one => .{ .mtllib_one = &node_data.string },
+        .mtllib_multi => .{ .mtllib_multi = ast.strListSliceToNull(node_data.index) },
+        .usemtl => .{ .usemtl = node_data.string },
+
+        inline //
+        .vp_u,
+        .vt_u,
+        .deg_curve,
+        => |tag| @unionInit(Node.Unzipped, @tagName(tag), node_data.value),
+
+        inline //
+        .o,
+        .s,
+        => |tag| @unionInit(Node.Unzipped, @tagName(tag), node_data.string),
+        inline //
+        .call_no_args,
+        .g_single,
+        => |tag| @unionInit(Node.Unzipped, @tagName(tag), &node_data.string),
+
+        inline //
+        .deg_surface,
+
+        .v_xyz,
+        .v_xyzw,
+
+        .vp_uv,
+        .vp_uvw,
+
+        .vt_uv,
+        .vt_uvw,
+
+        .vn_ijk,
+        => |tag| blk: {
+            const len = comptime switch (tag) {
+                .deg_surface => 2,
+
+                .v_xyz => 3,
+                .v_xyzw => 4,
+
+                .vp_uv => 2,
+                .vp_uvw => 3,
+
+                .vt_uv => 2,
+                .vt_uvw => 3,
+
+                .vn_ijk => 3,
+                else => unreachable,
+            };
+            const data: *const [len]StrSet.Index =
+                elemCast(StrSet.Index, ast.extra[node_data.index..][0..len]);
+            break :blk @unionInit(Node.Unzipped, @tagName(tag), data.*);
+        },
+
+        inline //
+        .f_one_v,
+        .f_one_v_vt,
+        .f_one_v_vn,
+        .f_one_v_vt_vn,
+
+        .f_two_v,
+        .f_two_v_vt,
+        .f_two_v_vn,
+        .f_two_v_vt_vn,
+
+        .f_three_v,
+        .f_three_v_vt,
+        .f_three_v_vn,
+        .f_three_v_vt_vn,
+
+        .f_four_v,
+        .f_four_v_vt,
+        .f_four_v_vn,
+        .f_four_v_vt_vn,
+        => |tag| blk: {
+            const len, const elem_size = comptime switch (tag) {
+                // zig fmt: off
+                    .f_one_v         => .{ 1, 1 },
+                    .f_one_v_vt      => .{ 1, 2 },
+                    .f_one_v_vn      => .{ 1, 2 },
+                    .f_one_v_vt_vn   => .{ 1, 3 },
+
+                    .f_two_v         => .{ 2, 1 },
+                    .f_two_v_vt      => .{ 2, 2 },
+                    .f_two_v_vn      => .{ 2, 2 },
+                    .f_two_v_vt_vn   => .{ 2, 3 },
+
+                    .f_three_v       => .{ 3, 1 },
+                    .f_three_v_vt    => .{ 3, 2 },
+                    .f_three_v_vn    => .{ 3, 2 },
+                    .f_three_v_vt_vn => .{ 3, 3 },
+
+                    .f_four_v        => .{ 4, 1 },
+                    .f_four_v_vt     => .{ 4, 2 },
+                    .f_four_v_vn     => .{ 4, 2 },
+                    .f_four_v_vt_vn  => .{ 4, 3 },
+                    else => unreachable,
+                    // zig fmt: on
+            };
+            const Elem = if (elem_size == 1) RefIndex else [elem_size]RefIndex;
+            const data: *const [len]Elem = elemCast(Elem, ast.extra[node_data.index..][0..len]);
+            break :blk @unionInit(Node.Unzipped, @tagName(tag), if (len == 1) &data[0] else data);
+        },
+
+        inline //
+        .f_multi_v,
+        .f_multi_v_vt,
+        .f_multi_v_vn,
+        .f_multi_v_vt_vn,
+        => |tag| blk: {
+            const layout: FaceTriplet.Layout = comptime switch (tag) {
+                .f_multi_v => .vertex_only,
+                .f_multi_v_vt => .only_vt,
+                .f_multi_v_vn => .only_vn,
+                .f_multi_v_vt_vn => .both_vt_vn,
+                else => unreachable,
+            };
+            break :blk @unionInit(
+                Node.Unzipped,
+                @tagName(tag),
+                ast.multiFaceList(node_data.index, layout),
+            );
+        },
+    };
+}
+
+pub fn full(self: Ast, node_index: Node.Index) Node.Full {
+    return self.unzipped(node_index).full();
+}
 
 fn strListSliceToNull(ast: Ast, index: u32) []const Ast.StrSet.Index {
     return std.mem.sliceTo(elemCast(Ast.StrSet.Index, ast.extra[index..]), .null);
@@ -881,65 +887,22 @@ fn elemCast(comptime Elem: type, src: anytype) @Type(.{ .pointer = blk: {
     return @ptrCast(src);
 }
 
-const TestUnzippedNode = union(Node.Tag) {
-    call: struct { []const u8, []const []const u8 },
-    call_no_args: []const u8,
+const TestUnzippedNode = union(Node.Full.Prefix) {
+    call: struct { ?[]const u8, []const []const u8 },
+    mtllib: []const []const u8,
+    usemtl: ?[]const u8,
 
-    mtllib_one: []const u8,
-    mtllib_multi: []const []const u8,
-    usemtl: []const u8,
+    o: ?[]const u8,
 
-    o: []const u8,
-
-    /// Like `v_xyz`, but `w` defaults to `1.0`.
-    v_xyz: [3][]const u8,
-    v_xyzw: [4][]const u8,
-
-    vn_ijk: [3][]const u8,
-
-    vp_u: []const u8,
-    vp_uv: [2][]const u8,
-    vp_uvw: [3][]const u8,
-
-    vt_u: []const u8,
-    vt_uv: [2][]const u8,
-    vt_uvw: [3][]const u8,
-
+    v: struct { []const u8, []const u8, []const u8, ?[]const u8 },
+    vn: [3][]const u8,
+    vp: struct { []const u8, ?[]const u8, ?[]const u8 },
+    vt: struct { []const u8, ?[]const u8, ?[]const u8 },
     cstype: Node.CsType,
-
-    deg_curve: []const u8,
-    deg_surface: [2][]const u8,
-
-    g_empty,
-    g_single: []const u8,
-    g_multi: []const []const u8,
-
-    s: []const u8,
-
-    f_one_v: RefIndex,
-    f_one_v_vt: [2]RefIndex,
-    f_one_v_vn: [2]RefIndex,
-    f_one_v_vt_vn: [3]RefIndex,
-
-    f_two_v: [2]RefIndex,
-    f_two_v_vt: [2][2]RefIndex,
-    f_two_v_vn: [2][2]RefIndex,
-    f_two_v_vt_vn: [2][3]RefIndex,
-
-    f_three_v: [3]RefIndex,
-    f_three_v_vt: [3][2]RefIndex,
-    f_three_v_vn: [3][2]RefIndex,
-    f_three_v_vt_vn: [3][3]RefIndex,
-
-    f_four_v: [4]RefIndex,
-    f_four_v_vt: [4][2]RefIndex,
-    f_four_v_vn: [4][2]RefIndex,
-    f_four_v_vt_vn: [4][3]RefIndex,
-
-    f_multi_v: []const RefIndex,
-    f_multi_v_vt: []const [2]RefIndex,
-    f_multi_v_vn: []const [2]RefIndex,
-    f_multi_v_vt_vn: []const [3]RefIndex,
+    deg: struct { []const u8, ?[]const u8 },
+    g: []const []const u8,
+    s: ?[]const u8,
+    f: Node.Full.FaceList,
 };
 
 fn testAstParse(
@@ -965,57 +928,75 @@ fn testAstParse(
     defer node_arena_state.deinit();
     const node_arena = node_arena_state.allocator();
 
-    for (
-        ast.nodes.items(.tag),
-        ast.nodes.items(.data),
-    ) |node_tag, node_data| {
-        const node: Ast.Node = .{
-            .tag = node_tag,
-            .data = node_data,
-        };
-        try actual.append(gpa, switch (node.unzipped(ast)) {
-            inline else => |payload, tag| @unionInit(
-                TestUnzippedNode,
-                @tagName(tag),
-                switch (@TypeOf(payload)) {
-                    void => {},
-                    Node.CsType => payload,
-                    StrSet.Index => ast.str_set.getStr(payload),
-
-                    []const StrSet.Index,
-                    => try strIndicesToStrings(node_arena, ast.str_set, payload),
-                    [2]StrSet.Index,
-                    [3]StrSet.Index,
-                    [4]StrSet.Index,
-                    => blk: {
-                        var result: [payload.len][]const u8 = @splat(undefined);
-                        for (&result, payload) |*res, str_idx| res.* = ast.str_set.getStr(str_idx);
-                        break :blk result;
-                    },
-                    Node.Unzipped.Call => .{
-                        ast.str_set.getStr(payload.filename()),
-                        try strIndicesToStrings(node_arena, ast.str_set, payload.args()),
-                    },
-
-                    RefIndex,
-                    [2]RefIndex,
-                    [3]RefIndex,
-                    [2][2]RefIndex,
-                    [2][3]RefIndex,
-                    [3][2]RefIndex,
-                    [3][3]RefIndex,
-                    [4]RefIndex,
-                    [4][2]RefIndex,
-                    [4][3]RefIndex,
-
-                    []const RefIndex,
-                    []const [2]RefIndex,
-                    []const [3]RefIndex,
-                    => payload,
-
-                    else => |T| @compileError(@typeName(T)),
+    for (0..ast.nodes.len) |node_index| {
+        try actual.append(gpa, switch (ast.full(@intCast(node_index))) {
+            inline else => |payload, tag| @unionInit(TestUnzippedNode, @tagName(tag), switch (tag) {
+                .call => .{
+                    ast.str_set.getStr(payload.filename()),
+                    try strIndicesToStrings(node_arena, ast.str_set, payload.args()),
                 },
-            ),
+                .mtllib => try strIndicesToStrings(node_arena, ast.str_set, payload),
+                .usemtl => ast.str_set.getStr(payload),
+                .o => ast.str_set.getStr(payload),
+                .v => v: {
+                    const x: StrSet.Index, //
+                    const y: StrSet.Index, //
+                    const z: StrSet.Index, //
+                    const w: StrSet.Index //
+                    = payload;
+                    break :v .{
+                        ast.str_set.getStr(x).?,
+                        ast.str_set.getStr(y).?,
+                        ast.str_set.getStr(z).?,
+                        ast.str_set.getStr(w),
+                    };
+                },
+                .vn => vn: {
+                    const i: StrSet.Index, //
+                    const j: StrSet.Index, //
+                    const k: StrSet.Index //
+                    = payload;
+                    break :vn .{
+                        ast.str_set.getStr(i).?,
+                        ast.str_set.getStr(j).?,
+                        ast.str_set.getStr(k).?,
+                    };
+                },
+                .vp => vp: {
+                    const u: StrSet.Index, //
+                    const v: StrSet.Index, //
+                    const w: StrSet.Index //
+                    = payload;
+                    break :vp .{
+                        ast.str_set.getStr(u).?,
+                        ast.str_set.getStr(v),
+                        ast.str_set.getStr(w),
+                    };
+                },
+                .vt => vt: {
+                    const u: StrSet.Index, //
+                    const v: StrSet.Index, //
+                    const w: StrSet.Index //
+                    = payload;
+                    break :vt .{
+                        ast.str_set.getStr(u).?,
+                        ast.str_set.getStr(v),
+                        ast.str_set.getStr(w),
+                    };
+                },
+                .cstype => payload,
+                .deg => deg: {
+                    const degu: StrSet.Index, const degv: StrSet.Index = payload;
+                    break :deg .{
+                        ast.str_set.getStr(degu).?,
+                        ast.str_set.getStr(degv),
+                    };
+                },
+                .g => try strIndicesToStrings(node_arena, ast.str_set, payload),
+
+                .s => ast.str_set.getStr(payload),
+                .f => payload,
+            }),
         });
     }
 
@@ -1156,7 +1137,7 @@ fn strIndicesToStrings(
     defer list.deinit(gpa);
     try list.ensureTotalCapacityPrecise(gpa, indices.len);
     std.debug.assert(list.unusedCapacitySlice().len == 0);
-    for (indices) |str_idx| list.appendAssumeCapacity(str_set.getStr(str_idx));
+    for (indices) |str_idx| list.appendAssumeCapacity(str_set.getStr(str_idx).?);
     return try list.toOwnedSlice(gpa);
 }
 
@@ -1203,7 +1184,7 @@ test "Escaped newlines" {
         \\baz
     ,
         &.{
-            .{ .deg_curve = "2.0" },
+            .{ .deg = .{ "2.0", null } },
             .{ .o = "foobarbaz" },
         },
     );
@@ -1217,7 +1198,7 @@ test "Vertices" {
         \\   0.000000
     ,
         &.{
-            .{ .v_xyz = .{ "-5.000000", "5.000000", "0.000000" } },
+            .{ .v = .{ "-5.000000", "5.000000", "0.000000", null } },
         },
     );
 
@@ -1259,25 +1240,25 @@ test "Vertices" {
         \\vp      0.500000       0.500000
     ,
         &.{
-            .{ .v_xyz = .{ "-5.000000", "5.000000", "0.000000" } },
-            .{ .v_xyz = .{ "-5.000000", "-5.000000", "0.000000" } },
-            .{ .v_xyz = .{ "5.000000", "-5.000000", "0.000000" } },
-            .{ .v_xyz = .{ "5.000000", "5.000000", "0.000000" } },
+            .{ .v = .{ "-5.000000", "5.000000", "0.000000", null } },
+            .{ .v = .{ "-5.000000", "-5.000000", "0.000000", null } },
+            .{ .v = .{ "5.000000", "-5.000000", "0.000000", null } },
+            .{ .v = .{ "5.000000", "5.000000", "0.000000", null } },
 
-            .{ .vt_uvw = .{ "-5.000000", "5.000000", "0.000000" } },
-            .{ .vt_uvw = .{ "-5.000000", "-5.000000", "0.000000" } },
-            .{ .vt_uvw = .{ "5.000000", "-5.000000", "0.000000" } },
-            .{ .vt_uvw = .{ "5.000000", "5.000000", "0.000000" } },
+            .{ .vt = .{ "-5.000000", "5.000000", "0.000000" } },
+            .{ .vt = .{ "-5.000000", "-5.000000", "0.000000" } },
+            .{ .vt = .{ "5.000000", "-5.000000", "0.000000" } },
+            .{ .vt = .{ "5.000000", "5.000000", "0.000000" } },
 
-            .{ .vn_ijk = .{ "0.000000", "0.000000", "1.000000" } },
-            .{ .vn_ijk = .{ "0.000000", "0.000000", "1.000000" } },
-            .{ .vn_ijk = .{ "0.000000", "0.000000", "1.000000" } },
-            .{ .vn_ijk = .{ "0.000000", "0.000000", "1.000000" } },
+            .{ .vn = .{ "0.000000", "0.000000", "1.000000" } },
+            .{ .vn = .{ "0.000000", "0.000000", "1.000000" } },
+            .{ .vn = .{ "0.000000", "0.000000", "1.000000" } },
+            .{ .vn = .{ "0.000000", "0.000000", "1.000000" } },
 
-            .{ .vp_uv = .{ "0.210000", "3.590000" } },
-            .{ .vp_uv = .{ "0.000000", "0.000000" } },
-            .{ .vp_uv = .{ "1.000000", "0.000000" } },
-            .{ .vp_uv = .{ "0.500000", "0.500000" } },
+            .{ .vp = .{ "0.210000", "3.590000", null } },
+            .{ .vp = .{ "0.000000", "0.000000", null } },
+            .{ .vp = .{ "1.000000", "0.000000", null } },
+            .{ .vp = .{ "0.500000", "0.500000", null } },
         },
     );
 }
@@ -1292,12 +1273,12 @@ test "curves/surfaces" {
         \\deg 3.0
     ,
         &.{
-            .{ .deg_curve = "5.0" },
-            .{ .deg_surface = .{ "5.0", "5.0" } },
-            .{ .deg_surface = .{ "5.0", "3.0" } },
-            .{ .deg_surface = .{ "3.0", "5.0" } },
-            .{ .deg_surface = .{ "3.0", "3.0" } },
-            .{ .deg_curve = "3.0" },
+            .{ .deg = .{ "5.0", null } },
+            .{ .deg = .{ "5.0", "5.0" } },
+            .{ .deg = .{ "5.0", "3.0" } },
+            .{ .deg = .{ "3.0", "5.0" } },
+            .{ .deg = .{ "3.0", "3.0" } },
+            .{ .deg = .{ "3.0", null } },
         },
     );
 }
@@ -1324,10 +1305,10 @@ test "faces" {
         \\
     ,
         &.{
-            .{ .f_one_v = .fromOneBased(1) },
-            .{ .f_one_v_vt = .{ .fromOneBased(1), .fromOneBased(2) } },
-            .{ .f_one_v_vn = .{ .fromOneBased(1), .fromOneBased(2) } },
-            .{ .f_one_v_vt_vn = .{ .fromOneBased(1), .fromOneBased(2), .fromOneBased(3) } },
+            .{ .f = .{ .vertex_only = &.{.fromOneBased(1)} } },
+            .{ .f = .{ .only_vt = &.{.{ .fromOneBased(1), .fromOneBased(2) }} } },
+            .{ .f = .{ .only_vn = &.{.{ .fromOneBased(1), .fromOneBased(2) }} } },
+            .{ .f = .{ .both_vt_vn = &.{.{ .fromOneBased(1), .fromOneBased(2), .fromOneBased(3) }} } },
         },
     );
 
@@ -1340,19 +1321,22 @@ test "faces" {
         \\
     ,
         &.{
-            .{ .f_two_v = .{ .fromOneBased(1), .fromOneBased(2) } },
-            .{ .f_two_v_vt = .{
+            .{ .f = .{ .vertex_only = &.{
+                .fromOneBased(1),
+                .fromOneBased(2),
+            } } },
+            .{ .f = .{ .only_vt = &.{
                 .{ .fromOneBased(1), .fromOneBased(2) },
                 .{ .fromOneBased(3), .fromOneBased(4) },
-            } },
-            .{ .f_two_v_vn = .{
+            } } },
+            .{ .f = .{ .only_vn = &.{
                 .{ .fromOneBased(1), .fromOneBased(2) },
                 .{ .fromOneBased(3), .fromOneBased(4) },
-            } },
-            .{ .f_two_v_vt_vn = .{
+            } } },
+            .{ .f = .{ .both_vt_vn = &.{
                 .{ .fromOneBased(1), .fromOneBased(2), .fromOneBased(3) },
                 .{ .fromOneBased(4), .fromOneBased(5), .fromOneBased(6) },
-            } },
+            } } },
         },
     );
 
@@ -1365,126 +1349,130 @@ test "faces" {
         \\
     ,
         &.{
-            .{ .f_three_v = .{ .fromOneBased(1), .fromOneBased(2), .fromOneBased(3) } },
-            .{ .f_three_v_vt = .{
+            .{ .f = .{ .vertex_only = &.{
+                .fromOneBased(1),
+                .fromOneBased(2),
+                .fromOneBased(3),
+            } } },
+            .{ .f = .{ .only_vt = &.{
                 .{ .fromOneBased(1), .fromOneBased(2) },
                 .{ .fromOneBased(3), .fromOneBased(4) },
                 .{ .fromOneBased(5), .fromOneBased(6) },
-            } },
-            .{ .f_three_v_vn = .{
+            } } },
+            .{ .f = .{ .only_vn = &.{
                 .{ .fromOneBased(1), .fromOneBased(2) },
                 .{ .fromOneBased(3), .fromOneBased(4) },
                 .{ .fromOneBased(5), .fromOneBased(6) },
-            } },
-            .{ .f_three_v_vt_vn = .{
+            } } },
+            .{ .f = .{ .both_vt_vn = &.{
                 .{ .fromOneBased(1), .fromOneBased(2), .fromOneBased(3) },
                 .{ .fromOneBased(4), .fromOneBased(5), .fromOneBased(6) },
                 .{ .fromOneBased(7), .fromOneBased(8), .fromOneBased(9) },
-            } },
+            } } },
         },
     );
 
     // -- four -- //
     try testAstParse(
         "f 1 2 3 4",
-        &.{.{ .f_four_v = .{
+        &.{.{ .f = .{ .vertex_only = &.{
             .fromOneBased(1),
             .fromOneBased(2),
             .fromOneBased(3),
             .fromOneBased(4),
-        } }},
+        } } }},
     );
     try testAstParse(
         "f 1/2 3/4 5/6 7/8",
-        &.{.{ .f_four_v_vt = .{
+        &.{.{ .f = .{ .only_vt = &.{
             .{ .fromOneBased(1), .fromOneBased(2) },
             .{ .fromOneBased(3), .fromOneBased(4) },
             .{ .fromOneBased(5), .fromOneBased(6) },
             .{ .fromOneBased(7), .fromOneBased(8) },
-        } }},
+        } } }},
     );
     try testAstParse(
         "f 1//2 3//4 5//6 7//8",
-        &.{.{ .f_four_v_vn = .{
+        &.{.{ .f = .{ .only_vn = &.{
             .{ .fromOneBased(1), .fromOneBased(2) },
             .{ .fromOneBased(3), .fromOneBased(4) },
             .{ .fromOneBased(5), .fromOneBased(6) },
             .{ .fromOneBased(7), .fromOneBased(8) },
-        } }},
+        } } }},
     );
     try testAstParse(
         "f 1/2/3 4/5/6 7/8/9 10/11/12",
-        &.{.{ .f_four_v_vt_vn = .{
+        &.{.{ .f = .{ .both_vt_vn = &.{
             .{ .fromOneBased(1), .fromOneBased(2), .fromOneBased(3) },
             .{ .fromOneBased(4), .fromOneBased(5), .fromOneBased(6) },
             .{ .fromOneBased(7), .fromOneBased(8), .fromOneBased(9) },
             .{ .fromOneBased(10), .fromOneBased(11), .fromOneBased(12) },
-        } }},
+        } } }},
     );
 
     // -- five -- //
-    try testAstParse("f 1 2 3 4 5", &.{.{ .f_multi_v = &.{
+    try testAstParse("f 1 2 3 4 5", &.{.{ .f = .{ .vertex_only = &.{
         .fromOneBased(1),
         .fromOneBased(2),
         .fromOneBased(3),
         .fromOneBased(4),
         .fromOneBased(5),
-    } }});
-    try testAstParse("f 1/2 3/4 5/6 7/8 9/10", &.{.{ .f_multi_v_vt = &.{
+    } } }});
+    try testAstParse("f 1/2 3/4 5/6 7/8 9/10", &.{.{ .f = .{ .only_vt = &.{
         .{ .fromOneBased(1), .fromOneBased(2) },
         .{ .fromOneBased(3), .fromOneBased(4) },
         .{ .fromOneBased(5), .fromOneBased(6) },
         .{ .fromOneBased(7), .fromOneBased(8) },
         .{ .fromOneBased(9), .fromOneBased(10) },
-    } }});
-    try testAstParse("f 1//2 3//4 5//6 7//8 9//10", &.{.{ .f_multi_v_vn = &.{
+    } } }});
+    try testAstParse("f 1//2 3//4 5//6 7//8 9//10", &.{.{ .f = .{ .only_vn = &.{
         .{ .fromOneBased(1), .fromOneBased(2) },
         .{ .fromOneBased(3), .fromOneBased(4) },
         .{ .fromOneBased(5), .fromOneBased(6) },
         .{ .fromOneBased(7), .fromOneBased(8) },
         .{ .fromOneBased(9), .fromOneBased(10) },
-    } }});
-    try testAstParse("f 1/2/3 4/5/6 7/8/9 10/11/12 13/14/15", &.{.{ .f_multi_v_vt_vn = &.{
+    } } }});
+    try testAstParse("f 1/2/3 4/5/6 7/8/9 10/11/12 13/14/15", &.{.{ .f = .{ .both_vt_vn = &.{
         .{ .fromOneBased(1), .fromOneBased(2), .fromOneBased(3) },
         .{ .fromOneBased(4), .fromOneBased(5), .fromOneBased(6) },
         .{ .fromOneBased(7), .fromOneBased(8), .fromOneBased(9) },
         .{ .fromOneBased(10), .fromOneBased(11), .fromOneBased(12) },
         .{ .fromOneBased(13), .fromOneBased(14), .fromOneBased(15) },
-    } }});
+    } } }});
 
     // -- six -- //
-    try testAstParse("f 1 2 3 4 5 6", &.{.{ .f_multi_v = &.{
+    try testAstParse("f 1 2 3 4 5 6", &.{.{ .f = .{ .vertex_only = &.{
         .fromOneBased(1),
         .fromOneBased(2),
         .fromOneBased(3),
         .fromOneBased(4),
         .fromOneBased(5),
         .fromOneBased(6),
-    } }});
-    try testAstParse("f 1/2 3/4 5/6 7/8 9/10 11/12", &.{.{ .f_multi_v_vt = &.{
+    } } }});
+    try testAstParse("f 1/2 3/4 5/6 7/8 9/10 11/12", &.{.{ .f = .{ .only_vt = &.{
         .{ .fromOneBased(1), .fromOneBased(2) },
         .{ .fromOneBased(3), .fromOneBased(4) },
         .{ .fromOneBased(5), .fromOneBased(6) },
         .{ .fromOneBased(7), .fromOneBased(8) },
         .{ .fromOneBased(9), .fromOneBased(10) },
         .{ .fromOneBased(11), .fromOneBased(12) },
-    } }});
-    try testAstParse("f 1//2 3//4 5//6 7//8 9//10 11//12", &.{.{ .f_multi_v_vn = &.{
+    } } }});
+    try testAstParse("f 1//2 3//4 5//6 7//8 9//10 11//12", &.{.{ .f = .{ .only_vn = &.{
         .{ .fromOneBased(1), .fromOneBased(2) },
         .{ .fromOneBased(3), .fromOneBased(4) },
         .{ .fromOneBased(5), .fromOneBased(6) },
         .{ .fromOneBased(7), .fromOneBased(8) },
         .{ .fromOneBased(9), .fromOneBased(10) },
         .{ .fromOneBased(11), .fromOneBased(12) },
-    } }});
-    try testAstParse("f 1/2/3 4/5/6 7/8/9 10/11/12 13/14/15 16/17/18", &.{.{ .f_multi_v_vt_vn = &.{
+    } } }});
+    try testAstParse("f 1/2/3 4/5/6 7/8/9 10/11/12 13/14/15 16/17/18", &.{.{ .f = .{ .both_vt_vn = &.{
         .{ .fromOneBased(1), .fromOneBased(2), .fromOneBased(3) },
         .{ .fromOneBased(4), .fromOneBased(5), .fromOneBased(6) },
         .{ .fromOneBased(7), .fromOneBased(8), .fromOneBased(9) },
         .{ .fromOneBased(10), .fromOneBased(11), .fromOneBased(12) },
         .{ .fromOneBased(13), .fromOneBased(14), .fromOneBased(15) },
         .{ .fromOneBased(16), .fromOneBased(17), .fromOneBased(18) },
-    } }});
+    } } }});
 }
 
 test "error: null byte" {

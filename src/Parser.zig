@@ -618,7 +618,7 @@ fn parseUnchecked(
                         nodes.appendAssumeCapacity(.{
                             .tag = node_tag_one,
                             .data = if (first_layout == .vertex_only)
-                                .{ .ref_index = first_triplet.value.v.nonNull() }
+                                .{ .ref_index = first_triplet.value.v.nonNull().? }
                             else
                                 .{ .index = extra_index },
                         });
@@ -1442,8 +1442,7 @@ fn parseRefIdxFromRawInt(
             break :ref_idx .from(@intCast(int_raw - 1));
         }
     };
-    if (ref_idx == .null) return null;
-    return ref_idx;
+    return ref_idx.nonNull();
 }
 
 // -- string iteration & look-ahead stuff -- //
@@ -1629,20 +1628,20 @@ fn zipUpFaceTriplet(
     try extra.ensureUnusedCapacity(gpa, curr_layout.zippedLength() + extra_capacity);
     switch (curr_layout) {
         .vertex_only => extra.appendAssumeCapacity(
-            @bitCast(triplet.v.nonNull().value().?),
+            @bitCast(triplet.v.value().?),
         ),
         .only_vt => extra.appendSliceAssumeCapacity(&.{
-            @bitCast(triplet.v.nonNull().value().?),
-            @bitCast(triplet.vt.nonNull().value().?),
+            @bitCast(triplet.v.value().?),
+            @bitCast(triplet.vt.value().?),
         }),
         .only_vn => extra.appendSliceAssumeCapacity(&.{
-            @bitCast(triplet.v.nonNull().value().?),
-            @bitCast(triplet.vn.nonNull().value().?),
+            @bitCast(triplet.v.value().?),
+            @bitCast(triplet.vn.value().?),
         }),
         .both_vt_vn => extra.appendSliceAssumeCapacity(&.{
-            @bitCast(triplet.v.nonNull().value().?),
-            @bitCast(triplet.vt.nonNull().value().?),
-            @bitCast(triplet.vn.nonNull().value().?),
+            @bitCast(triplet.v.value().?),
+            @bitCast(triplet.vt.value().?),
+            @bitCast(triplet.vn.value().?),
         }),
     }
 }

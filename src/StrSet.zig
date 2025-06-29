@@ -23,7 +23,8 @@ pub fn deinit(self: StrSet, gpa: std.mem.Allocator) void {
     set.deinit(gpa);
 }
 
-pub fn getStr(self: StrSet, index: StrSet.Index) []const u8 {
+pub fn getStr(self: StrSet, maybe_index: StrSet.Index) ?[]const u8 {
+    const index = maybe_index.nonNull() orelse return null;
     std.debug.assert(self.indexer.containsContext(index, stridx.hashCtx(self.bytes)));
     return stridx.idxSliceTo(self.bytes, index);
 }

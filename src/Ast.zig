@@ -270,6 +270,21 @@ pub const Node = struct {
         };
     };
 
+    pub const Call = struct {
+        argv: []const StrSet.Index,
+
+        /// May be null.
+        pub fn filename(call: Call) StrSet.Index {
+            return if (call.argv.len != 0) call.argv[0] else .null;
+        }
+
+        /// May be empty.
+        pub fn args(call: Call) []const StrSet.Index {
+            const start = @intFromBool(call.argv.len != 0);
+            return call.argv[start..];
+        }
+    };
+
     pub const Unzipped = union(Tag) {
         call: Call,
         call_no_args: *const StrSet.Index,
@@ -331,22 +346,7 @@ pub const Node = struct {
         f_multi_v_vn: []const [2]RefIndex,
         f_multi_v_vt_vn: []const [3]RefIndex,
 
-        pub const Call = struct {
-            argv: []const StrSet.Index,
-
-            /// May be null.
-            pub fn filename(call: Call) StrSet.Index {
-                return if (call.argv.len != 0) call.argv[0] else .null;
-            }
-
-            /// May be empty.
-            pub fn args(call: Call) []const StrSet.Index {
-                const start = @intFromBool(call.argv.len != 0);
-                return call.argv[start..];
-            }
-        };
-
-        pub fn full(self: Unzipped) Full {
+        pub fn full(self: Unzipped) Statement {
             return switch (self) {
                 .call => |call| .{ .call = call },
                 .call_no_args => |filename| .{ .call = .{ .argv = filename[0..1] } },
@@ -408,68 +408,68 @@ pub const Node = struct {
             };
         }
     };
+};
 
-    pub const Full = union(Prefix) {
-        call: Unzipped.Call,
-        mtllib: []const StrSet.Index,
-        usemtl: StrSet.Index,
-        /// Never null.
-        o: StrSet.Index,
-        /// x, y, z, w = v
-        /// x, y and z are never null.
-        /// w may be null, in which case it should be interpreted as `1.0`.
-        v: [4]StrSet.Index,
-        /// i, j, k = vp
-        /// i, j, and k are never null.
-        vn: [3]StrSet.Index,
-        /// u, v, w = vp
-        /// u is never null.
-        /// v may be null iff w is null.
-        /// w may be null.
-        vp: [3]StrSet.Index,
-        /// u, v, w = vp
-        /// u is never null.
-        /// v may be null iff w is null.
-        /// w may be null.
-        vt: [3]StrSet.Index,
-        cstype: CsType,
-        /// degu, degv = deg
-        /// degu is never null.
-        /// degv may be null.
-        ///
-        /// if degv is null, it's a curve.
-        /// if degv is not null, it's a surface.
-        deg: [2]StrSet.Index,
-        g: []const StrSet.Index,
-        s: StrSet.Index,
-        f: FaceList,
+pub const Statement = union(Kind) {
+    call: Node.Call,
+    mtllib: []const StrSet.Index,
+    usemtl: StrSet.Index,
+    /// Never null.
+    o: StrSet.Index,
+    /// x, y, z, w = v
+    /// x, y and z are never null.
+    /// w may be null, in which case it should be interpreted as `1.0`.
+    v: [4]StrSet.Index,
+    /// i, j, k = vp
+    /// i, j, and k are never null.
+    vn: [3]StrSet.Index,
+    /// u, v, w = vp
+    /// u is never null.
+    /// v may be null iff w is null.
+    /// w may be null.
+    vp: [3]StrSet.Index,
+    /// u, v, w = vp
+    /// u is never null.
+    /// v may be null iff w is null.
+    /// w may be null.
+    vt: [3]StrSet.Index,
+    cstype: Node.CsType,
+    /// degu, degv = deg
+    /// degu is never null.
+    /// degv may be null.
+    ///
+    /// if degv is null, it's a curve.
+    /// if degv is not null, it's a surface.
+    deg: [2]StrSet.Index,
+    g: []const StrSet.Index,
+    s: StrSet.Index,
+    f: FaceList,
 
-        pub const Prefix = enum {
-            call,
-            mtllib,
-            usemtl,
-            o,
-            v,
-            vn,
-            vp,
-            vt,
-            cstype,
-            deg,
-            g,
-            s,
-            f,
-        };
+    pub const Kind = enum {
+        call,
+        mtllib,
+        usemtl,
+        o,
+        v,
+        vn,
+        vp,
+        vt,
+        cstype,
+        deg,
+        g,
+        s,
+        f,
+    };
 
-        pub const FaceList = union(FaceTriplet.Layout) {
-            /// `v`
-            vertex_only: []const RefIndex,
-            /// `v/vt`
-            only_vt: []const [2]RefIndex,
-            /// `v//vn`
-            only_vn: []const [2]RefIndex,
-            /// `v/vt/vn`
-            both_vt_vn: []const [3]RefIndex,
-        };
+    pub const FaceList = union(FaceTriplet.Layout) {
+        /// `v`
+        vertex_only: []const RefIndex,
+        /// `v/vt`
+        only_vt: []const [2]RefIndex,
+        /// `v//vn`
+        only_vn: []const [2]RefIndex,
+        /// `v/vt/vn`
+        both_vt_vn: []const [3]RefIndex,
     };
 };
 
@@ -844,7 +844,7 @@ pub fn unzipped(ast: Ast, node_index: Node.Index) Node.Unzipped {
     };
 }
 
-pub fn full(self: Ast, node_index: Node.Index) Node.Full {
+pub fn full(self: Ast, node_index: Node.Index) Statement {
     return self.unzipped(node_index).full();
 }
 
@@ -887,7 +887,7 @@ fn elemCast(comptime Elem: type, src: anytype) @Type(.{ .pointer = blk: {
     return @ptrCast(src);
 }
 
-const TestUnzippedNode = union(Node.Full.Prefix) {
+const TestUnzippedNode = union(Statement.Kind) {
     call: struct { ?[]const u8, []const []const u8 },
     mtllib: []const []const u8,
     usemtl: ?[]const u8,
@@ -902,7 +902,7 @@ const TestUnzippedNode = union(Node.Full.Prefix) {
     deg: struct { []const u8, ?[]const u8 },
     g: []const []const u8,
     s: ?[]const u8,
-    f: Node.Full.FaceList,
+    f: Statement.FaceList,
 };
 
 fn testAstParse(

@@ -218,13 +218,13 @@ fn parseUnchecked(
 
     mainloop: while (true) {
         const prefix_line = self.line;
-        const maybe_prefix: ?Ast.Node.Full.Prefix, const prefix_loc: Lexer.Token.Loc = switch (self.nextTok()) {
+        const maybe_prefix: ?Ast.Statement.Kind, const prefix_loc: Lexer.Token.Loc = switch (self.nextTok()) {
             .str => |first_loc| blk: {
                 var str_iter = self.stringIter(first_loc) orelse break :blk .{
-                    std.meta.stringToEnum(Ast.Node.Full.Prefix, first_loc.getStr(src)),
+                    std.meta.stringToEnum(Ast.Statement.Kind, first_loc.getStr(src)),
                     first_loc,
                 };
-                const maybe_prefix = str_iter.peekToEnum(Ast.Node.Full.Prefix);
+                const maybe_prefix = str_iter.peekToEnum(Ast.Statement.Kind);
                 str_iter.consume();
                 break :blk .{ maybe_prefix, str_iter.fullSrcLoc() };
             },

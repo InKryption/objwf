@@ -443,7 +443,7 @@ pub const Statement = union(Kind) {
     deg: [2]StrSet.Index,
     g: []const StrSet.Index,
     s: StrSet.Index,
-    f: FaceList,
+    f: FaceTriplet.List,
 
     pub const Kind = enum {
         call,
@@ -459,17 +459,6 @@ pub const Statement = union(Kind) {
         g,
         s,
         f,
-    };
-
-    pub const FaceList = union(FaceTriplet.Layout) {
-        /// `v`
-        vertex_only: []const RefIndex,
-        /// `v/vt`
-        only_vt: []const [2]RefIndex,
-        /// `v//vn`
-        only_vn: []const [2]RefIndex,
-        /// `v/vt/vn`
-        both_vt_vn: []const [3]RefIndex,
     };
 };
 
@@ -514,68 +503,6 @@ pub const RefIndex = enum(Int) {
     pub fn valueAllowNull(self: RefIndex) Int {
         return @intFromEnum(self);
     }
-
-    pub fn emptyIfNullFmt(self: RefIndex) EmptyIfNullFmt {
-        return .{ .ref_index = self };
-    }
-
-    pub const EmptyIfNullFmt = packed struct {
-        ref_index: RefIndex,
-
-        pub fn format(
-            self: EmptyIfNullFmt,
-            comptime fmt_str: []const u8,
-            fmt_options: std.fmt.FormatOptions,
-            writer: anytype,
-        ) @TypeOf(writer).Error!void {
-            switch (self.ref_index) {
-                .null => try writer.writeAll(""),
-                _ => |non_null| try std.fmt.formatIntValue(
-                    non_null.value().? + 1,
-                    fmt_str,
-                    fmt_options,
-                    writer,
-                ),
-            }
-        }
-    };
-
-    pub const NullTerminatedListFmt = union(FaceTriplet.Layout) {
-        vertex_only: []const RefIndex,
-        only_vt: []const [2]RefIndex,
-        only_vn: []const [2]RefIndex,
-        both_vt_vn: []const [3]RefIndex,
-
-        pub fn format(
-            self: NullTerminatedListFmt,
-            comptime fmt_str: []const u8,
-            fmt_options: std.fmt.FormatOptions,
-            writer: anytype,
-        ) @TypeOf(writer).Error!void {
-            switch (self) {
-                inline else => |indices, tag| for (indices, 0..) |index_or_list, triplet_i| {
-                    if (triplet_i != 0) try writer.writeAll(" ");
-                    switch (tag) {
-                        .vertex_only => {
-                            try index_or_list.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
-                        },
-                        .only_vt => for (index_or_list, 0..) |ref_index, ref_index_i| {
-                            if (ref_index_i != 0) try writer.writeAll("/");
-                            try ref_index.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
-                        },
-                        .only_vn => for (index_or_list, 0..) |ref_index, ref_index_i| {
-                            if (ref_index_i != 0) try writer.writeAll("//");
-                            try ref_index.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
-                        },
-                        .both_vt_vn => for (index_or_list, 0..) |ref_index, ref_index_i| {
-                            if (ref_index_i != 0) try writer.writeAll("/");
-                            try ref_index.emptyIfNullFmt().format(fmt_str, fmt_options, writer);
-                        },
-                    }
-                },
-            }
-        }
-    };
 };
 
 pub const FaceTriplet = struct {
@@ -611,6 +538,51 @@ pub const FaceTriplet = struct {
         if (self.vn == .null) return .only_vt;
         return .both_vt_vn;
     }
+
+    pub const List = union(Layout) {
+        /// `v`
+        vertex_only: []const RefIndex,
+        /// `v/vt`
+        only_vt: []const [2]RefIndex,
+        /// `v//vn`
+        only_vn: []const [2]RefIndex,
+        /// `v/vt/vn`
+        both_vt_vn: []const [3]RefIndex,
+
+        pub fn fmt(list: List) Fmt {
+            return .{ .list = list };
+        }
+
+        pub const Fmt = struct {
+            list: List,
+
+            pub fn format(
+                self: Fmt,
+                writer: *std.Io.Writer,
+            ) std.io.Writer.Error!void {
+                switch (self.list) {
+                    inline else => |indices, tag| for (indices, 0..) |index_or_list, triplet_i| {
+                        if (triplet_i != 0) try writer.writeAll(" ");
+                        switch (tag) {
+                            .vertex_only => try writer.printInt(index_or_list.value().?, 10, .lower, .{}),
+                            .only_vt => for (index_or_list, 0..) |ref_index, ref_index_i| {
+                                if (ref_index_i != 0) try writer.writeByte("/");
+                                try writer.printInt(ref_index.value().?, 10, .lower, .{});
+                            },
+                            .only_vn => for (index_or_list, 0..) |ref_index, ref_index_i| {
+                                if (ref_index_i != 0) try writer.writeAll("//");
+                                try writer.printInt(ref_index.value().?, 10, .lower, .{});
+                            },
+                            .both_vt_vn => for (index_or_list, 0..) |ref_index, ref_index_i| {
+                                if (ref_index_i != 0) try writer.writeAll("/");
+                                try writer.printInt(ref_index.value().?, 10, .lower, .{});
+                            },
+                        }
+                    },
+                }
+            }
+        };
+    };
 };
 
 pub const Indices = struct {
@@ -902,7 +874,7 @@ const TestUnzippedNode = union(Statement.Kind) {
     deg: struct { []const u8, ?[]const u8 },
     g: []const []const u8,
     s: ?[]const u8,
-    f: Statement.FaceList,
+    f: FaceTriplet.List,
 };
 
 fn testAstParse(

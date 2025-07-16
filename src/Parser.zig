@@ -112,13 +112,8 @@ pub const ParseDiagnostic = union {
 
             pub fn format(
                 self: Fmt,
-                comptime fmt_str: []const u8,
-                fmt_options: std.fmt.FormatOptions,
-                writer: anytype,
-            ) @TypeOf(writer).Error!void {
-                _ = fmt_str;
-                _ = fmt_options;
-
+                writer: *std.Io.Writer,
+            ) std.Io.Writer.Error!void {
                 switch (self.diag) {
                     inline //
                     .InvalidBytes,

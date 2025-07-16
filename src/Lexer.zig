@@ -113,12 +113,8 @@ pub const Token = union(Kind) {
 
     pub fn format(
         self: Token,
-        comptime fmt_str: []const u8,
-        fmt_options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) @TypeOf(writer).Error!void {
-        _ = fmt_str;
-        _ = fmt_options;
+        writer: *std.Io.Writer,
+    ) std.io.Writer.Error!void {
         try std.zon.stringify.serialize(self, .{ .whitespace = true }, writer);
     }
 };

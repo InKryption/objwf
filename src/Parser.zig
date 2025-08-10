@@ -867,9 +867,9 @@ const Debug = struct {
 
     fn assertPrevTokenEql(self: *const Debug, expected: Lexer.Token) void {
         if (!Debug.enabled) return;
-        const actual = self.state.prev_tok orelse std.debug.panic("Expected {}, found null", .{expected});
+        const actual = self.state.prev_tok orelse std.debug.panic("Expected {f}, found null", .{expected});
         if (!expected.eql(actual)) {
-            std.debug.panic("Expected {}, found {}", .{ expected, actual });
+            std.debug.panic("Expected {f}, found {f}", .{ expected, actual });
         }
     }
     fn assertPrevTokenKindWasNot(
@@ -1235,21 +1235,21 @@ fn expectRefIdxTriplet(
         std.fmt.count("{0d}/{0d}/{0d}", .{std.math.maxInt(IntOneBasedMaybeNeg)}),
         std.fmt.count("{0d}/{0d}/{0d}", .{std.math.minInt(IntOneBasedMaybeNeg)}),
     );
-    const TripletBstr = std.BoundedArray(u8, max_triplet_len);
 
-    const triplet_bstr: TripletBstr, //
+    var triplet_str_buffer: [max_triplet_len]u8 = undefined;
+    const triplet_str: []const u8, //
     const full_loc: Lexer.Token.Loc //
     = src: {
-        var triplet_bstr: TripletBstr = .{};
+        var triplet_str: std.ArrayListUnmanaged(u8) = .initBuffer(&triplet_str_buffer);
 
         var str_iter = self.stringIter(first_loc) orelse {
-            triplet_bstr.appendSlice(first_loc.getStr(self.lexer.src)) catch
+            triplet_str.appendSliceBounded(first_loc.getStr(self.lexer.src)) catch
                 return diag.ret(error.InvalidReferenceIndexTriplet, .{
                     .line = line,
                     .loc = first_loc,
                 });
             break :src .{
-                triplet_bstr,
+                triplet_str.items,
                 first_loc,
             };
         };
@@ -1269,7 +1269,7 @@ fn expectRefIdxTriplet(
                 .start => switch (char) {
                     '-' => {
                         state = .start_neg;
-                        triplet_bstr.append('-') catch {
+                        triplet_str.appendBounded('-') catch {
                             str_iter.consume();
                             return diag.ret(error.InvalidReferenceIndexTriplet, .{
                                 .line = line,
@@ -1283,7 +1283,7 @@ fn expectRefIdxTriplet(
                     '0' => state = .skipping_leading_zeroes,
                     '/' => {
                         state = .start;
-                        triplet_bstr.append('/') catch {
+                        triplet_str.appendBounded('/') catch {
                             str_iter.consume();
                             return diag.ret(error.InvalidReferenceIndexTriplet, .{
                                 .line = line,
@@ -1300,7 +1300,7 @@ fn expectRefIdxTriplet(
                     '0' => {},
                     '/' => {
                         state = .start;
-                        triplet_bstr.append('0') catch {
+                        triplet_str.appendBounded('0') catch {
                             str_iter.consume();
                             return diag.ret(error.InvalidReferenceIndexTriplet, .{
                                 .line = line,
@@ -1314,7 +1314,7 @@ fn expectRefIdxTriplet(
                     },
                 },
                 .reading_digits => {
-                    triplet_bstr.append(char) catch {
+                    triplet_str.appendBounded(char) catch {
                         str_iter.consume();
                         return diag.ret(error.InvalidReferenceIndexTriplet, .{
                             .line = line,
@@ -1329,9 +1329,8 @@ fn expectRefIdxTriplet(
         }
         str_iter.consume();
 
-        break :src .{ triplet_bstr, str_iter.fullSrcLoc() };
+        break :src .{ triplet_str.items, str_iter.fullSrcLoc() };
     };
-    const triplet_str = triplet_bstr.constSlice();
 
     var splitter = std.mem.splitScalar(u8, triplet_str, '/');
     const v_str = splitter.first();
@@ -1518,21 +1517,23 @@ const StringIter = struct {
             }
             break :blk max_kw_len;
         };
-        const bstr = self.peekToBoundedArray(max_kw_len) orelse return null;
-        return std.meta.stringToEnum(Keyword, bstr.slice());
+        var buffer: [max_kw_len]u8 = undefined;
+        const bstr = self.peekToBoundedArray(max_kw_len, &buffer) orelse return null;
+        return std.meta.stringToEnum(Keyword, bstr);
     }
 
     fn peekToBoundedArray(
         self: StringIter,
-        comptime max_bytes: usize,
-    ) ?std.BoundedArray(u8, max_bytes) {
+        comptime max_len: usize,
+        buffer: *[max_len]u8,
+    ) ?[]const u8 {
         var peeker = self.toPeeker();
-        var bstr: std.BoundedArray(u8, max_bytes) = .{};
+        var bstr: std.ArrayListUnmanaged(u8) = .initBuffer(buffer);
         while (true) {
             const segment, _ = peeker.next() orelse break;
-            bstr.appendSlice(segment) catch return null;
+            bstr.appendSliceBounded(segment) catch return null;
         }
-        return bstr;
+        return bstr.items;
     }
 
     fn toPeeker(self: StringIter) StringIter {

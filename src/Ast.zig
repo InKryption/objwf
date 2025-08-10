@@ -887,7 +887,7 @@ fn testAstParse(
     const ast = Ast.parse(gpa, src, &diag) catch |err| return switch (err) {
         error.OutOfMemory => |e| e,
         else => |e| {
-            std.log.err("{}", .{diag.tagged(e).fmt(src)});
+            std.log.err("{f}", .{diag.tagged(e).fmt(src)});
         },
     };
     defer ast.deinit(gpa);

@@ -114,7 +114,7 @@ pub const Token = union(Kind) {
     pub fn format(
         self: Token,
         writer: *std.Io.Writer,
-    ) std.io.Writer.Error!void {
+    ) std.Io.Writer.Error!void {
         try std.zon.stringify.serialize(self, .{ .whitespace = true }, writer);
     }
 };

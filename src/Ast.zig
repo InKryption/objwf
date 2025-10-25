@@ -86,7 +86,7 @@ pub const Node = struct {
     pub const Index = u32;
 
     pub const Data = packed union {
-        empty: void,
+        empty: enum (u32) { unset },
         index: u32,
         string: StrSet.Index,
         /// Source string for a value (ie an f32 string).

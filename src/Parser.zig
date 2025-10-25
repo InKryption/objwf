@@ -536,7 +536,7 @@ fn parseUnchecked(
                             .line = prefix_line,
                             .loc = prefix_loc,
                         });
-                        nodes.appendAssumeCapacity(.{ .tag = node_tag, .data = .{ .empty = {} } });
+                        nodes.appendAssumeCapacity(.{ .tag = node_tag, .data = .{ .empty = .unset } });
                         continue :mainloop;
                     },
                 };

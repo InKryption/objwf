@@ -179,10 +179,10 @@ pub fn next(self: *Lexer) Token {
                     }
                 }
 
-                return if (self.processNewline())
-                    .{ .comment_nl_two = .initAbs(start, self.index) }
-                else
-                    .{ .comment_nl_one = .initAbs(start, self.index) };
+                return switch (self.processNewline()) {
+                    .crlf => .{ .comment_nl_two = .initAbs(start, self.index) },
+                    .cr, .lf => .{ .comment_nl_one = .initAbs(start, self.index) },
+                };
             }
         },
 
@@ -226,21 +226,20 @@ pub fn next(self: *Lexer) Token {
 /// After calling this, the caller can have `const end = self.index;`,
 /// with `src[start..end]` forming the newline, which is either cr, lf,
 /// or crlf.
-/// Returns true for crlf, false for cr or lf.
-fn processNewline(self: *Lexer) bool {
+fn processNewline(self: *Lexer) enum { cr, lf, crlf } {
     const src = self.src;
     switch (typedChar(src[self.index])) {
         else => unreachable, // should only call when it's one of lf or cr
         .lf => {
             self.index += 1;
-            return false;
+            return .lf;
         },
         .cr => {
             self.index += 1;
-            if (self.index == src.len) return false;
-            if (src[self.index] != '\n') return false;
+            if (self.index == src.len) return .cr;
+            if (src[self.index] != '\n') return .cr;
             self.index += 1;
-            return true;
+            return .crlf;
         },
     }
 }
